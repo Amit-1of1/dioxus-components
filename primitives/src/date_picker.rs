@@ -1168,10 +1168,13 @@ pub fn DateRangePickerInputValue(props: DateRangePickerInputValueProps) -> Eleme
     let mut start_date = use_signal(move || selected_range.map(|range| range.start()));
     let mut end_date = use_signal(move || selected_range.map(|range| range.end()));
 
+    // PATCH(rust-ui): only write when the value changes. A signal write notifies even when the
+    // value is the same, and `DateElement` writes the typed date back on every change of its
+    // segments, so typing a complete start date looped forever and froze the page.
     use_effect(move || {
         let date_range = ctx.date_range.cloned();
-        start_date.set(date_range.map(|r| r.start()));
-        end_date.set(date_range.map(|r| r.end()));
+        set_if_changed(start_date, date_range.map(|r| r.start()));
+        set_if_changed(end_date, date_range.map(|r| r.end()));
     });
 
     use_effect(move || {
@@ -1217,6 +1220,14 @@ pub fn DateRangePickerInputValue(props: DateRangePickerInputValueProps) -> Eleme
     }
 }
 
+// PATCH(rust-ui): write a signal only when the value differs, so effects that copy values
+// back and forth between the range and its two date inputs settle instead of looping.
+fn set_if_changed<T: PartialEq + 'static>(mut signal: Signal<T>, value: T) {
+    if *signal.peek() != value {
+        signal.set(value);
+    }
+}
+
 /// The editable start date value in a range picker input.
 #[component]
 pub fn DateRangePickerStartValue(props: DateRangePickerStartValueProps) -> Element {
@@ -1225,7 +1236,8 @@ pub fn DateRangePickerStartValue(props: DateRangePickerStartValueProps) -> Eleme
     rsx! {
         DateElement {
             selected_date: ctx.start_date,
-            on_date_change: move |date| ctx.start_date.set(date),
+            // PATCH(rust-ui): see `set_if_changed`.
+            on_date_change: move |date| set_if_changed(ctx.start_date, date),
             on_format_day_placeholder: ctx.on_format_day_placeholder,
             on_format_month_placeholder: ctx.on_format_month_placeholder,
             on_format_year_placeholder: ctx.on_format_year_placeholder,
@@ -1243,7 +1255,8 @@ pub fn DateRangePickerEndValue(props: DateRangePickerEndValueProps) -> Element {
         DateElement {
             start_index: 3,
             selected_date: ctx.end_date,
-            on_date_change: move |date| ctx.end_date.set(date),
+            // PATCH(rust-ui): see `set_if_changed`.
+            on_date_change: move |date| set_if_changed(ctx.end_date, date),
             on_format_day_placeholder: ctx.on_format_day_placeholder,
             on_format_month_placeholder: ctx.on_format_month_placeholder,
             on_format_year_placeholder: ctx.on_format_year_placeholder,

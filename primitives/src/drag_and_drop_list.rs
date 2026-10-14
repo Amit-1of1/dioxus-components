@@ -97,9 +97,48 @@ pub struct DragAndDropContext {
     list_items: Signal<Vec<SortableListItem>>,
     focus: CollectionState,
     announcement: Signal<String>,
+    // PATCH(rust-ui): an item pressed but not yet dragged (index, client y), for the
+    // pointer-driven drag used where HTML drag and drop does not exist (see `no_script`).
+    press: Signal<Option<(usize, f64)>>,
 }
 
 impl DragAndDropContext {
+    /// PATCH(rust-ui): pointer drags where HTML drag and drop is missing (dioxus-native has no
+    /// `dragstart`/`dragover`/`drop`). A press on an item becomes a drag once the pointer has
+    /// moved a few pixels; moving over items picks the drop slot; releasing over the list
+    /// drops; leaving the list cancels.
+    fn pointer_press(&mut self, index: usize, y: f64) {
+        if !crate::no_script::scripts_supported() && !self.is_dragging() {
+            self.press.set(Some((index, y)));
+        }
+    }
+
+    fn pointer_move(&mut self, y: f64) {
+        if let Some((index, start_y)) = (self.press)() {
+            if (y - start_y).abs() > 4.0 {
+                self.press.set(None);
+                self.start_drag(index);
+                self.drag_over(index, DropPosition::Undefined);
+            }
+        }
+    }
+
+    fn pointer_release(&mut self) {
+        self.press.set(None);
+        if crate::no_script::scripts_supported() || !self.is_dragging() {
+            return;
+        }
+        self.drop();
+        self.end_drag();
+    }
+
+    fn pointer_leave(&mut self) {
+        self.press.set(None);
+        if !crate::no_script::scripts_supported() && self.is_dragging() {
+            self.cancel_drag();
+        }
+    }
+
     fn drag_from(&self) -> Option<usize> {
         match (self.drag)() {
             DragState::Idle => None,
@@ -364,11 +403,13 @@ pub fn DragAndDropList(props: DragAndDropListProps) -> Element {
     let announcement = use_signal(String::new);
     let focus = use_collection_provider(ReadSignal::new(Signal::new(true)));
 
+    let press = use_signal(|| None);
     use_context_provider(move || DragAndDropContext {
         drag,
         list_items,
         focus,
         announcement,
+        press,
     });
 
     let label = props
@@ -456,6 +497,10 @@ pub fn DragAndDropListItems(props: DragAndDropListItemsProps) -> Element {
                 event.prevent_default();
                 ctx.drop();
             },
+            // PATCH(rust-ui): pointer drags where HTML drag and drop is missing.
+            onpointermove: move |event| ctx.pointer_move(event.client_coordinates().y),
+            onpointerup: move |_| ctx.pointer_release(),
+            onpointerleave: move |_| ctx.pointer_leave(),
             ..props.attributes,
             {children}
         }
@@ -733,6 +778,27 @@ pub fn DragAndDropListItem(props: DragAndDropListItemProps) -> Element {
                 }
             },
             //ondragleave: move |_| ctx.drop_to.set(None),
+            // PATCH(rust-ui): pointer drags where HTML drag and drop is missing.
+            onpointerdown: move |event| {
+                if event.trigger_button() == Some(dioxus::html::input_data::MouseButton::Primary) {
+                    ctx.pointer_press(index, event.client_coordinates().y);
+                }
+            },
+            onpointermove: move |event| async move {
+                if crate::no_script::scripts_supported() || !ctx.is_dragging() {
+                    return;
+                }
+                let Some(md) = item_ref() else { return };
+                if let Ok(rect) = md.get_client_rect().await {
+                    let mid_y = rect.origin.y + rect.size.height / 2.0;
+                    let position = if event.client_coordinates().y < mid_y {
+                        DropPosition::Before
+                    } else {
+                        DropPosition::After
+                    };
+                    ctx.drag_over(index, position);
+                }
+            },
             onkeydown,
             ..props.attributes,
             {props.children}

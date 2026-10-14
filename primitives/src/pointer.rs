@@ -76,7 +76,8 @@ fn upsert_pointer(pointers: &mut Vec<Pointer>, pointer_id: i32, position: Client
     }
 }
 
-fn update_pointer(pointer_id: i32, position: ClientPoint) {
+// PATCH(rust-ui): crate-visible for `no_script::PointerShield`.
+pub(crate) fn update_pointer(pointer_id: i32, position: ClientPoint) {
     if let Some(pointer) = POINTERS
         .write()
         .iter_mut()
@@ -86,7 +87,8 @@ fn update_pointer(pointer_id: i32, position: ClientPoint) {
     }
 }
 
-fn remove_pointer(pointer_id: i32) {
+// PATCH(rust-ui): crate-visible for `no_script::PointerShield`.
+pub(crate) fn remove_pointer(pointer_id: i32) {
     POINTERS.write().retain(|pointer| pointer.id != pointer_id);
 }
 

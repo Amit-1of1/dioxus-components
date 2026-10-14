@@ -1,5 +1,6 @@
 //! Defines the [`ContextMenu`] component and its subcomponents, which provide a context menu interface.
 
+use crate::no_script::use_focus_scope;
 use crate::{
     collection::{collection_item, use_collection_provider, use_item, CollectionState},
     selectable::{pointer_select_cancel, pointer_select_commit, pointer_select_start},
@@ -170,11 +171,22 @@ pub fn ContextMenu(props: ContextMenuProps) -> Element {
         }
     };
 
+    // PATCH(rust-ui): without scripts, focus leaving the menu (a click outside moves or clears
+    // it) closes it (see `no_script`).
+    let scope = use_focus_scope(move |_| {
+        if open() {
+            ctx.focus.clear_focus();
+            set_open.call(false);
+        }
+    });
+
     rsx! {
         div {
             id: root_id,
             tabindex: 0, // Make the menu container focusable
             onkeydown: handle_keydown,
+            onfocusin: move |_| scope.focus_in(),
+            onfocusout: move |_| scope.focus_out(),
             "data-state": if open() { "open" } else { "closed" },
             "data-disabled": (props.disabled)(),
             ..props.attributes,

@@ -1,5 +1,8 @@
 //! Defines the [`AlertDialogRoot`] component and its sub-components.
 
+use crate::no_script::{
+    focus_without_scripts, is_fallback_escape, scripts_supported, use_focus_scope,
+};
 use crate::use_global_escape_listener;
 use crate::{use_animated_open, use_id_or, use_unique_id, FOCUS_TRAP_JS};
 use dioxus::document;
@@ -203,6 +206,15 @@ pub fn AlertDialogContent(props: AlertDialogContentProps) -> Element {
         let _ = eval.send(open.cloned());
     });
 
+    // PATCH(rust-ui): without scripts, focus moves into the dialog when it opens, Escape is
+    // handled on the dialog, and focus leaving it is brought back (see `no_script`).
+    let mut element = use_signal(|| None::<std::rc::Rc<MountedData>>);
+    let scope = use_focus_scope(move |_| {
+        if open() {
+            focus_without_scripts(element());
+        }
+    });
+
     rsx! {
         div {
             id,
@@ -211,6 +223,20 @@ pub fn AlertDialogContent(props: AlertDialogContentProps) -> Element {
             aria_labelledby: ctx.labelledby.clone(),
             aria_describedby: ctx.describedby.clone(),
             class: props.class.clone().unwrap_or_else(|| "dx-alert-dialog".to_string()),
+            tabindex: (!scripts_supported()).then_some("-1"),
+            onmounted: move |event| {
+                element.set(Some(event.data()));
+                focus_without_scripts(Some(event.data()));
+            },
+            onfocusin: move |_| scope.focus_in(),
+            onfocusout: move |_| scope.focus_out(),
+            onkeydown: move |event| {
+                scope.key_down(&event);
+                if is_fallback_escape(&event) {
+                    event.stop_propagation();
+                    set_open.call(false);
+                }
+            },
             ..props.attributes,
             {props.children}
         }

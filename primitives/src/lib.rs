@@ -33,8 +33,10 @@ pub mod label;
 mod listbox;
 pub mod menubar;
 mod move_interaction;
+// PATCH(rust-ui): fallbacks for renderers without JavaScript.
 #[cfg(feature = "router")]
 pub mod navbar;
+mod no_script;
 mod pointer;
 pub mod popover;
 mod portal;

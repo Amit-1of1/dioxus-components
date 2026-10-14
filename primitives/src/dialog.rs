@@ -3,6 +3,9 @@
 use dioxus::document;
 use dioxus::prelude::*;
 
+use crate::no_script::{
+    focus_without_scripts, is_fallback_escape, scripts_supported, use_focus_scope,
+};
 use crate::{
     use_animated_open, use_controlled, use_global_escape_listener, use_id_or, use_outside_dismiss,
     use_unique_id, FOCUS_TRAP_JS,
@@ -253,6 +256,21 @@ pub fn DialogContent(props: DialogContentProps) -> Element {
         let _ = eval.send(open.cloned());
     });
 
+    // PATCH(rust-ui): without scripts, focus moves into the dialog when it opens, Escape is
+    // handled on the dialog, a click outside (which moves or clears focus) closes it, and Tab
+    // out of a modal dialog brings focus back (see `no_script`).
+    let mut element = use_signal(|| None::<std::rc::Rc<MountedData>>);
+    let scope = use_focus_scope(move |by_keyboard| {
+        if !open() {
+            return;
+        }
+        if by_keyboard && is_modal() {
+            focus_without_scripts(element());
+        } else {
+            set_open.call(false);
+        }
+    });
+
     rsx! {
         div {
             id,
@@ -261,6 +279,20 @@ pub fn DialogContent(props: DialogContentProps) -> Element {
             aria_labelledby: ctx.dialog_labelledby,
             aria_describedby: ctx.dialog_describedby,
             class: props.class.clone().unwrap_or_else(|| "dx-dialog".to_string()),
+            tabindex: (!scripts_supported()).then_some("-1"),
+            onmounted: move |event| {
+                element.set(Some(event.data()));
+                focus_without_scripts(Some(event.data()));
+            },
+            onfocusin: move |_| scope.focus_in(),
+            onfocusout: move |_| scope.focus_out(),
+            onkeydown: move |event| {
+                scope.key_down(&event);
+                if is_fallback_escape(&event) {
+                    event.stop_propagation();
+                    set_open.call(false);
+                }
+            },
             ..props.attributes,
             {props.children}
         }

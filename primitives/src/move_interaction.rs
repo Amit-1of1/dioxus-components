@@ -148,6 +148,13 @@ impl MoveInteraction {
         })
     }
 
+    /// PATCH(rust-ui): the pointer being dragged with, for `no_script::PointerShield`.
+    pub(crate) fn active_pointer(&self) -> Option<i32> {
+        (self.dragging)()
+            .then(|| (self.active_pointer_id)())
+            .flatten()
+    }
+
     pub(crate) fn end_pointer(&mut self) {
         self.active_pointer_id.take();
         self.last_pointer_position.set(None);

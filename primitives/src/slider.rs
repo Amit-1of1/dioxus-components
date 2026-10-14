@@ -438,6 +438,10 @@ fn SliderImpl(props: SliderImplProps) -> Element {
             ..props.attributes,
 
             {props.children}
+            // PATCH(rust-ui): follow the drag where document-level pointer listeners can't run.
+            if let Some(pointer_id) = movement.active_pointer() {
+                crate::no_script::PointerShield { pointer_id }
+            }
         }
     }
 }

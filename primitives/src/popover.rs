@@ -3,6 +3,9 @@
 use dioxus::document;
 use dioxus::prelude::*;
 
+use crate::no_script::{
+    focus_without_scripts, is_fallback_escape, scripts_supported, use_focus_scope,
+};
 use crate::{
     use_animated_open, use_controlled, use_global_escape_listener, use_id_or, use_outside_dismiss,
     use_unique_id, ContentAlign, ContentSide, FOCUS_TRAP_JS,
@@ -20,6 +23,8 @@ struct PopoverCtx {
     is_modal: ReadSignal<bool>,
     labelledby: Signal<String>,
     root_id: Memo<String>,
+    // PATCH(rust-ui): the open content, for the no-script focus trap.
+    content: Signal<Option<std::rc::Rc<MountedData>>>,
 }
 
 /// The props for the [`PopoverRoot`] component.
@@ -107,19 +112,38 @@ pub fn PopoverRoot(props: PopoverRootProps) -> Element {
     let root_id = use_id_or(gen_root_id, props.id);
 
     let (open, set_open) = use_controlled(props.open, props.default_open, props.on_open_change);
+    let content = use_signal(|| None);
+    let is_modal = props.is_modal;
 
     use_context_provider(|| PopoverCtx {
         open,
         set_open,
-        is_modal: props.is_modal,
+        is_modal,
         labelledby,
         root_id,
+        content,
+    });
+
+    // PATCH(rust-ui): without scripts, focus leaving the popover (a click outside moves or
+    // clears it) closes it; Tab out of a modal popover brings focus back (see `no_script`).
+    let scope = use_focus_scope(move |by_keyboard| {
+        if !open() {
+            return;
+        }
+        if by_keyboard && is_modal() {
+            focus_without_scripts(content());
+        } else {
+            set_open.call(false);
+        }
     });
 
     rsx! {
         div {
             id: root_id,
             "data-state": if open() { "open" } else { "closed" },
+            onfocusin: move |_| scope.focus_in(),
+            onfocusout: move |_| scope.focus_out(),
+            onkeydown: move |event| scope.key_down(&event),
             ..props.attributes,
             {props.children}
         }
@@ -294,6 +318,19 @@ pub fn PopoverContentRendered(
             "data-state": if is_open { "open" } else { "closed" },
             "data-side": side.as_str(),
             "data-align": align.as_str(),
+            // PATCH(rust-ui): without scripts, take focus on open and handle Escape here.
+            tabindex: (!scripts_supported()).then_some("-1"),
+            onmounted: move |event| {
+                let mut content = ctx.content;
+                content.set(Some(event.data()));
+                focus_without_scripts(Some(event.data()));
+            },
+            onkeydown: move |event| {
+                if is_fallback_escape(&event) {
+                    event.stop_propagation();
+                    set_open.call(false);
+                }
+            },
             ..attributes,
             {children}
         }

@@ -246,8 +246,19 @@ pub fn ToastProvider(props: ToastProviderProps) -> Element {
     });
 
     rsx! {
-        // Render children
-        {props.children}
+        // Render children. PATCH(rust-ui): without scripts there is no document-level
+        // listener, so F6 is also heard on this box (it works while focus is inside the app).
+        // The box is always rendered so server and client markup match.
+        div {
+            style: "display: contents;",
+            onkeydown: move |event: KeyboardEvent| {
+                if !crate::no_script::scripts_supported() && event.key() == Key::F6 {
+                    event.prevent_default();
+                    focus_region(());
+                }
+            },
+            {props.children}
+        }
 
         // Render toast container using portal
         PortalIn { portal,

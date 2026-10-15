@@ -155,12 +155,22 @@ pub fn DatePicker(props: DatePickerProps) -> Element {
     rsx! {
         div {
             role: "group",
-            aria_label: "Date",
+            // PATCH(rust-ui): see `has_accessible_name`.
+            aria_label: (!has_accessible_name(&props.attributes)).then_some("Date"),
             "data-disabled": (props.disabled)(),
             ..props.attributes,
             {props.children}
         }
     }
+}
+
+// PATCH(rust-ui): the group's built-in English name is a fallback only. An `aria-label` or
+// `aria-labelledby` passed in the attributes names the group instead of sitting beside the
+// hard-coded one, so a picker can be tied to its visible label.
+fn has_accessible_name(attributes: &[Attribute]) -> bool {
+    attributes
+        .iter()
+        .any(|a| a.name == "aria-label" || a.name == "aria-labelledby")
 }
 
 /// The context provided by the [`DateRangePicker`] component to its children.
@@ -290,7 +300,8 @@ pub fn DateRangePicker(props: DateRangePickerProps) -> Element {
     rsx! {
         div {
             role: "group",
-            aria_label: "Date Range",
+            // PATCH(rust-ui): see `has_accessible_name`.
+            aria_label: (!has_accessible_name(&props.attributes)).then_some("Date Range"),
             "data-disabled": (props.disabled)(),
             ..props.attributes,
             {props.children}
@@ -676,10 +687,14 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
         let value = text.parse::<T>().map(|v| v.min(max)).ok();
         if let Some(value) = value {
             let inRange = value >= min && value <= max;
+            // PATCH(rust-ui): a segment that holds all its digits ("09" for a month) is complete
+            // too. Upstream only moved on when one more digit would pass the maximum, so "01" to
+            // "09" for a month and "01" to "03" for a day stayed put.
+            let full = text.len() >= props.max_length;
 
             // If adding a new digit would exceed max, move to next segment
             let newValue = (text + "0").parse::<T>().unwrap_or(value);
-            if inRange && newValue > max {
+            if inRange && (newValue > max || full) {
                 ctx.focus.focus_next();
             }
         };
@@ -785,7 +800,6 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
 
     let span_id = use_unique_id();
     let id = use_memo(move || format!("span-{span_id}"));
-    let label_id = format!("{id}-label");
 
     rsx! {
         span {
@@ -794,7 +808,8 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
             aria_valuemin: props.min.to_string(),
             aria_valuemax: props.max.to_string(),
             aria_valuenow: now_value.to_string(),
-            aria_labelledby: "{label_id}",
+            // PATCH(rust-ui): no `aria-labelledby` here. It pointed at `{id}-label`, an element
+            // nothing renders, so the segment's `aria-label` ("year", "month", "day") names it.
             inputmode: "numeric",
             contenteditable: !(ctx.read_only)(),
             spellcheck: false,

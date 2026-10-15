@@ -410,6 +410,8 @@ pub struct ToastCloseButtonProps {
 
 #[derive(Clone)]
 struct ToastRenderCtx {
+    // PATCH(rust-ui): `ToastContent` picks its live region role from the type.
+    toast_type: ToastType,
     label_id: String,
     description_id: Option<String>,
     title: String,
@@ -483,6 +485,7 @@ pub fn Toast(props: ToastProps) -> Element {
     // Get the context at the top level of the component
     let ctx = use_context::<ToastCtx>();
     use_context_provider(|| ToastRenderCtx {
+        toast_type: props.toast_type,
         label_id: label_id.clone(),
         description_id: description_id.clone(),
         title: props.title.clone(),
@@ -522,10 +525,13 @@ pub fn Toast(props: ToastProps) -> Element {
     rsx! {
         div {
             id,
-            role: "alertdialog",
+            // PATCH(rust-ui): a named group, not `role="alertdialog"`. A toast is not a dialog:
+            // screen readers announced each one as a dialog, and tests asking for the
+            // alertdialog found toasts too. The message is announced by `ToastContent`'s live
+            // region; the group keeps the toast focusable (F6) with its title as its name.
+            role: "group",
             aria_labelledby: "{label_id}",
             aria_describedby: description_id,
-            aria_modal: "false",
             tabindex: "0",
 
             "data-type": props.toast_type.as_str(),
@@ -544,9 +550,15 @@ pub fn Toast(props: ToastProps) -> Element {
 /// The content wrapper inside a toast.
 #[component]
 pub fn ToastContent(props: ToastContentProps) -> Element {
+    // PATCH(rust-ui): errors and warnings interrupt (`alert`); info and success wait their
+    // turn (`status`), as the WAI-ARIA status pattern asks. Upstream made every toast an alert.
+    let role = match try_use_context::<ToastRenderCtx>().map(|ctx| ctx.toast_type) {
+        Some(ToastType::Error | ToastType::Warning) | None => "alert",
+        Some(ToastType::Success | ToastType::Info) => "status",
+    };
     rsx! {
         div {
-            role: "alert",
+            role,
             aria_atomic: "true",
             ..props.attributes,
             {props.children}

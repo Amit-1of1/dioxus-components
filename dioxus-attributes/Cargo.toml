@@ -1,11 +1,15 @@
 [package]
-name = "dioxus-attributes"
+# PATCH(rust-ui): published as rust-ui-attributes for rust-ui-primitives; the library keeps its name.
+name = "rust-ui-attributes"
 version = "0.1.0"
 edition = "2021"
 description = "Proc macro for creating dynamic attribute lists for Dioxus elements"
 license = "MIT OR Apache-2.0"
+authors = ["Dioxus Labs"]
+repository = "https://github.com/Amit-1of1/dioxus-components"
 
 [lib]
+name = "dioxus_attributes"
 proc-macro = true
 
 [dependencies]

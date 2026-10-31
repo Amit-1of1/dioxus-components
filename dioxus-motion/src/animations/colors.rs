@@ -1,0 +1,292 @@
+//! Color module for animation support
+//!
+//! Provides RGBA color representation and animation interpolation.
+//! Supports both normalized (0.0-1.0) and byte (0-255) color values.
+
+use crate::animations::core::Animatable;
+use wide::f32x4;
+
+/// Represents an RGBA color with normalized components
+///
+/// Constructors and interpolation clamp components to 0.0–1.0.
+/// Arithmetic preserves signed, unbounded components for spring displacement,
+/// force, and velocity; `to_rgba` saturates these values for display.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Color {
+    /// Red component (0.0-1.0)
+    pub r: f32,
+    /// Green component (0.0-1.0)
+    pub g: f32,
+    /// Blue component (0.0-1.0)
+    pub b: f32,
+    /// Alpha component (0.0-1.0)
+    pub a: f32,
+}
+
+impl Color {
+    /// Creates a new color with normalized components
+    ///
+    /// # Examples
+    /// ```
+    /// use dioxus_motion::prelude::Color;
+    /// let color = Color::new(1.0, 0.5, 0.0, 1.0); // Orange color
+    /// ```
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self {
+            r: r.clamp(0.0, 1.0),
+            g: g.clamp(0.0, 1.0),
+            b: b.clamp(0.0, 1.0),
+            a: a.clamp(0.0, 1.0),
+        }
+    }
+
+    /// Creates a color from 8-bit RGBA values
+    ///
+    /// # Examples
+    /// ```
+    /// use dioxus_motion::prelude::Color;
+    /// let color = Color::from_rgba(255, 128, 0, 255); // Orange color
+    /// ```
+    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Color::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        )
+    }
+
+    /// Converts color to 8-bit RGBA values
+    ///
+    /// # Returns
+    /// Tuple of (r,g,b,a) with values from 0-255
+    pub fn to_rgba(&self) -> (u8, u8, u8, u8) {
+        (
+            (self.r * 255.0 + 0.5) as u8,
+            (self.g * 255.0 + 0.5) as u8,
+            (self.b * 255.0 + 0.5) as u8,
+            (self.a * 255.0 + 0.5) as u8,
+        )
+    }
+}
+
+impl Default for Color {
+    fn default() -> Self {
+        Color::new(0.0, 0.0, 0.0, 1.0) // Black with full opacity
+    }
+}
+
+impl std::ops::Add for Color {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            r: self.r + other.r,
+            g: self.g + other.g,
+            b: self.b + other.b,
+            a: self.a + other.a,
+        }
+    }
+}
+
+impl std::ops::Sub for Color {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            r: self.r - other.r,
+            g: self.g - other.g,
+            b: self.b - other.b,
+            a: self.a - other.a,
+        }
+    }
+}
+
+impl std::ops::Mul<f32> for Color {
+    type Output = Self;
+
+    fn mul(self, factor: f32) -> Self {
+        Self {
+            r: self.r * factor,
+            g: self.g * factor,
+            b: self.b * factor,
+            a: self.a * factor,
+        }
+    }
+}
+
+/// Implementation of Animatable for Color
+/// Much simpler with the new trait design - uses standard operators
+impl Animatable for Color {
+    fn is_finite(&self) -> bool {
+        [self.r, self.g, self.b, self.a]
+            .into_iter()
+            .all(f32::is_finite)
+    }
+
+    fn interpolate(&self, target: &Self, t: f32) -> Self {
+        let a = [self.r, self.g, self.b, self.a];
+        let b = [target.r, target.g, target.b, target.a];
+        let va = f32x4::new(a);
+        let vb = f32x4::new(b);
+        let progress = f32x4::splat(t.clamp(0.0, 1.0));
+        // A weighted blend avoids overflowing the difference between finite endpoints.
+        // Any overflow of the sum saturates correctly when converted to a display color.
+        let out = (va * (f32x4::splat(1.0) - progress) + vb * progress).to_array();
+        Color::new(out[0], out[1], out[2], out[3])
+    }
+
+    fn magnitude(&self) -> f32 {
+        crate::animations::core::magnitude([self.r, self.g, self.b, self.a].into_iter())
+    }
+
+    // Uses default epsilon of 0.01 from the trait - no need for COLOR_EPSILON
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fuzz_color_interpolation_handles_finite_extremes_and_clamped_endpoints() {
+        let raw = |r, g, b, a| Color { r, g, b, a };
+        for (start, end) in [
+            (
+                raw(-f32::MAX, f32::MAX, -f32::MAX, f32::MAX),
+                raw(f32::MAX, -f32::MAX, f32::MAX, -f32::MAX),
+            ),
+            (
+                raw(f32::MAX, f32::MAX, f32::MAX, f32::MAX),
+                Color::new(1.0, 0.5, 0.25, 0.75),
+            ),
+            (
+                Color::new(1.0, 0.5, 0.25, 0.75),
+                raw(f32::MAX, f32::MAX, f32::MAX, f32::MAX),
+            ),
+        ] {
+            for progress in [-1.0f32, 0.0, 0.25, 0.5, 0.75, 1.0, 2.0] {
+                let lerp = |a: f32, b: f32| {
+                    (f64::from(a)
+                        + (f64::from(b) - f64::from(a)) * f64::from(progress.clamp(0.0, 1.0)))
+                        as f32
+                };
+                let expected = if progress <= 0.0 {
+                    Color::new(start.r, start.g, start.b, start.a)
+                } else if progress >= 1.0 {
+                    Color::new(end.r, end.g, end.b, end.a)
+                } else {
+                    Color::new(
+                        lerp(start.r, end.r),
+                        lerp(start.g, end.g),
+                        lerp(start.b, end.b),
+                        lerp(start.a, end.a),
+                    )
+                };
+                assert_eq!(
+                    start.interpolate(&end, progress),
+                    expected,
+                    "progress={progress}"
+                );
+            }
+        }
+        let mut bits = 1u32;
+        for _ in 0..4096 {
+            let mut sample = || {
+                bits = bits.wrapping_mul(1664525).wrapping_add(1013904223);
+                f32::from_bits(bits)
+            };
+            let start = raw(sample(), sample(), sample(), sample());
+            let end = raw(sample(), sample(), sample(), sample());
+            if start.is_finite() && end.is_finite() {
+                for progress in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                    let actual = start.interpolate(&end, progress);
+                    assert!(actual.is_finite());
+                    assert!(
+                        [actual.r, actual.g, actual.b, actual.a]
+                            .into_iter()
+                            .all(|channel| (0.0..=1.0).contains(&channel))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn arithmetic_preserves_signed_components_and_display_saturates() {
+        let a = Color::new(0.125, 0.25, 0.5, 0.75);
+        let b = Color::new(0.75, 0.5, 0.25, 0.875);
+        assert_eq!(
+            a + b,
+            Color {
+                r: 0.875,
+                g: 0.75,
+                b: 0.75,
+                a: 1.625
+            }
+        );
+        assert_eq!(
+            a - b,
+            Color {
+                r: -0.625,
+                g: -0.25,
+                b: 0.25,
+                a: -0.125
+            }
+        );
+        assert_eq!(
+            a * 4.0,
+            Color {
+                r: 0.5,
+                g: 1.0,
+                b: 2.0,
+                a: 3.0
+            }
+        );
+        assert_eq!((a - b).to_rgba(), (0, 0, 64, 0));
+        assert_eq!((a * 4.0).to_rgba(), (128, 255, 255, 255));
+        assert_eq!(
+            Color::new(-1.0, 2.0, 0.5, 1.0).to_rgba(),
+            (0, 255, 128, 255)
+        );
+    }
+
+    #[test]
+    fn test_color_new() {
+        let color = Color::new(1.0, 0.5, 0.0, 1.0);
+        assert_eq!(color.r, 1.0);
+        assert_eq!(color.g, 0.5);
+        assert_eq!(color.b, 0.0);
+        assert_eq!(color.a, 1.0);
+    }
+
+    #[test]
+    fn test_color_from_rgba() {
+        let color = Color::from_rgba(255, 128, 0, 255);
+        assert!((color.r - 1.0).abs() < f32::EPSILON);
+        assert!((color.g - 0.5019608).abs() < 0.000001);
+        assert!((color.b - 0.0).abs() < f32::EPSILON);
+        assert!((color.a - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_color_lerp() {
+        let start = Color::new(0.0, 0.0, 0.0, 1.0);
+        let end = Color::new(1.0, 1.0, 1.0, 1.0);
+        let mid = start.interpolate(&end, 0.5);
+
+        assert!((mid.r - 0.5).abs() < f32::EPSILON);
+        assert!((mid.g - 0.5).abs() < f32::EPSILON);
+        assert!((mid.b - 0.5).abs() < f32::EPSILON);
+        assert!((mid.a - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_color_to_rgba() {
+        let color = Color::new(1.0, 0.5, 0.0, 1.0);
+        let (r, g, b, a) = color.to_rgba();
+        assert_eq!(r, 255);
+        assert_eq!(g, 128);
+        assert_eq!(b, 0);
+        assert_eq!(a, 255);
+    }
+}

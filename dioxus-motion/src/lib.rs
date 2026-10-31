@@ -1,0 +1,272 @@
+//! Dioxus Motion - Animation library for Dioxus
+//!
+//! Provides smooth animations for web and native applications built with Dioxus.
+//! Supports both spring physics and tween-based animations with configurable parameters.
+//!
+//! # Features
+//! - **Simplified Animatable trait** - Uses standard Rust operators (`+`, `-`, `*`) for math operations
+//! - Exact spring transitions with cached frame coefficients
+//! - Spring physics and validated tween interpolation
+//! - Tween animations with custom easing
+//! - Color interpolation
+//! - Transform animations
+//! - Configurable animation loops
+//! - Animation sequences with independent playback state
+//! - Type-specific completion tolerances with validated overrides
+//! - Browser timers that release callbacks on completion or cancellation
+//!
+//! # Example
+//! ```rust,no_run
+//! # #[cfg(feature = "dioxus")] {
+//! use dioxus_motion::prelude::*;
+//!
+//! let mut value = use_motion(0.0f32).expect("finite initial value");
+//!
+//! // Basic animation - automatically uses all optimizations
+//! value.animate_to(100.0, AnimationConfig::new(AnimationMode::Spring(Spring::default()))).expect("valid animation configuration");
+//!
+//! // Animation with custom epsilon for fine-tuned performance (optional)
+//! value.animate_to(
+//!     100.0,
+//!     AnimationConfig::new(AnimationMode::Spring(Spring::default()))
+//!         .with_epsilon(0.001) // Tighter threshold for high-precision animations
+//! ).expect("valid animation configuration");
+//!
+//! // Check if animation is running
+//! if value.is_running() {
+//!     println!("Animation is active with current value: {}", value.get_value());
+//! }
+//! # }
+//! ```
+//!
+//! # Creating Custom Animatable Types
+//!
+//! The simplified `Animatable` trait requires three methods and leverages standard Rust traits:
+//!
+//! ```rust
+//! use dioxus_motion::prelude::*;
+//! use dioxus_motion::animations::core::Animatable;
+//!
+//! #[derive(Debug, Clone, PartialEq, Default)]
+//! struct Point { x: f32, y: f32 }
+//!
+//! // Implement standard math operators
+//! impl std::ops::Add for Point {
+//!     type Output = Self;
+//!     fn add(self, other: Self) -> Self {
+//!         Self { x: self.x + other.x, y: self.y + other.y }
+//!     }
+//! }
+//!
+//! impl std::ops::Sub for Point {
+//!     type Output = Self;
+//!     fn sub(self, other: Self) -> Self {
+//!         Self { x: self.x - other.x, y: self.y - other.y }
+//!     }
+//! }
+//!
+//! impl std::ops::Mul<f32> for Point {
+//!     type Output = Self;
+//!     fn mul(self, factor: f32) -> Self {
+//!         Self { x: self.x * factor, y: self.y * factor }
+//!     }
+//! }
+//!
+//! // Implement Animatable with three methods
+//! impl Animatable for Point {
+//!     fn is_finite(&self) -> bool {
+//!         [self.x, self.y].into_iter().all(f32::is_finite)
+//!     }
+
+//!     fn interpolate(&self, target: &Self, t: f32) -> Self {
+//!         self.clone() + (target.clone() - self.clone()) * t
+//!     }
+//!     
+//!     fn magnitude(&self) -> f32 {
+//!         (self.x * self.x + self.y * self.y).sqrt()
+//!     }
+//! }
+//! ```
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::panic)]
+#![deny(unused_variables)]
+#![deny(unused_must_use)]
+#![deny(unsafe_code)] // Prevent unsafe blocks
+#![deny(clippy::unwrap_in_result)] // No unwrap() on Result
+// #![deny(clippy::indexing_slicing)] // Prevent unchecked indexing
+#![deny(rustdoc::broken_intra_doc_links)] // Check doc links
+// #![deny(clippy::arithmetic_side_effects)] // Check for integer overflow
+#![deny(clippy::modulo_arithmetic)] // Check modulo operations
+#![deny(clippy::option_if_let_else)] // Prefer map/and_then
+
+#[cfg(feature = "dioxus")]
+use animations::core::Animatable;
+#[cfg(feature = "dioxus")]
+use dioxus::prelude::*;
+pub use instant::Duration;
+
+pub mod animations;
+pub mod keyframes;
+#[cfg(feature = "dioxus")]
+pub mod manager;
+pub mod motion;
+#[cfg(feature = "dioxus")]
+pub mod presence;
+#[cfg(feature = "dioxus")]
+mod presence_macros;
+pub mod sequence;
+mod style_macros;
+#[cfg(feature = "transitions")]
+pub mod transitions;
+
+#[cfg(feature = "transitions")]
+pub use dioxus_motion_transitions_macro;
+
+pub use animations::platform::{MotionTime, TimeProvider};
+
+pub use keyframes::{Keyframe, KeyframeAnimation};
+#[cfg(feature = "dioxus")]
+pub use manager::{AnimationManager, MotionHandle};
+#[cfg(test)]
+pub(crate) use motion::Motion;
+
+// Re-exports
+pub mod prelude {
+    pub use crate::animations::core::{AnimationConfig, AnimationError, AnimationMode, LoopMode};
+    pub use crate::animations::css::{CssColor, CssComplexValue, CssValue, IntoCssValue};
+    pub use crate::animations::style::MotionStyle;
+    pub use crate::animations::{
+        colors::Color, spring::Spring, transform::Transform, tween::Tween,
+    };
+    #[cfg(feature = "transitions")]
+    pub use crate::dioxus_motion_transitions_macro::MotionTransitions;
+    pub use crate::motion_style;
+    #[cfg(feature = "dioxus")]
+    pub use crate::presence::{
+        AnimatePresence, PresenceAnchorX, PresenceAnchorY, PresenceConfig, PresenceCustom,
+        PresenceHandle, PresenceLayout, PresenceMode, use_is_present, use_presence,
+        use_presence_data, use_presence_motion, use_presence_motion_completion,
+        use_presence_motion_with_transitions, use_presence_style,
+    };
+    #[cfg(feature = "dioxus")]
+    pub use crate::presence_style;
+    pub use crate::sequence::AnimationSequence;
+    #[cfg(feature = "transitions")]
+    pub use crate::transitions::config::TransitionVariant;
+    #[cfg(feature = "transitions")]
+    pub use crate::transitions::page_transitions::TransitionVariantResolver;
+    #[cfg(feature = "transitions")]
+    pub use crate::transitions::page_transitions::{AnimatableRoute, AnimatedOutlet};
+    #[cfg(feature = "dioxus")]
+    pub use crate::{AnimationManager, MotionHandle, use_motion};
+    pub use crate::{Duration, Time, TimeProvider};
+}
+
+pub type Time = MotionTime;
+
+#[cfg(feature = "dioxus")]
+/// Helper function to calculate the appropriate delay for the animation loop
+fn calculate_delay(dt: f32, running_frames: u32) -> Duration {
+    #[cfg(feature = "web")]
+    {
+        // running_frames is not used in web builds but kept for API consistency
+        let _ = running_frames;
+        let _ = dt;
+        Duration::from_millis(8)
+    }
+    #[cfg(not(feature = "web"))]
+    {
+        if running_frames <= 200 {
+            Duration::from_micros(8333) // ~120fps
+        } else {
+            match dt {
+                x if x < 0.005 => Duration::from_millis(8),  // ~120fps
+                x if x < 0.011 => Duration::from_millis(16), // ~60fps
+                _ => Duration::from_millis(33),              // ~30fps
+            }
+        }
+    }
+}
+
+/// Creates an animation manager that continuously updates a motion state.
+///
+/// This function initializes a motion state with the provided initial value and spawns an asynchronous loop
+/// that updates the animation state based on the elapsed time between frames. When the animation is running,
+/// it updates the state using the calculated time delta and dynamically adjusts the update interval to optimize CPU usage;
+/// when the animation is inactive, it waits longer before polling again.
+///
+/// # Example
+///
+/// ```no_run
+/// # #[cfg(feature = "dioxus")] {
+/// use dioxus_motion::prelude::*;
+/// use dioxus::prelude::*;
+///
+/// fn app() -> Element {
+///     let mut value = use_motion(0.0f32).expect("finite initial value");
+///
+///     // Animate to 100 with spring physics
+///     value.animate_to(
+///         100.0,
+///         AnimationConfig::new(AnimationMode::Spring(Spring::default()))
+///     ).expect("valid animation configuration");
+///
+///     rsx! {
+///         div {
+///             style: "transform: translateY({value.get_value()}px)",
+///             "Animated content"
+///         }
+///     }
+/// }
+/// # }
+/// ```
+#[cfg(feature = "dioxus")]
+pub fn use_motion<T: Animatable + Send + 'static>(
+    initial: T,
+) -> Result<MotionHandle<T>, prelude::AnimationError> {
+    let mut state = MotionHandle::new_hook(initial)?;
+
+    #[cfg(feature = "web")]
+    let idle_poll_rate = Duration::from_millis(100);
+
+    #[cfg(not(feature = "web"))]
+    let idle_poll_rate = Duration::from_millis(33);
+
+    use_effect(move || {
+        // This executes after rendering is complete
+        spawn(async move {
+            let mut last_frame = Time::now();
+            let mut running_frames = 0u32;
+
+            loop {
+                let now = Time::now();
+                let is_running = state.is_running();
+
+                let delay = if is_running && running_frames == 0 {
+                    last_frame = now;
+                    running_frames = 1;
+                    Duration::from_millis(8)
+                } else if is_running {
+                    let dt = now.duration_since(last_frame).as_secs_f32().min(0.1);
+                    last_frame = now;
+                    running_frames = running_frames.saturating_add(1);
+                    if let Err(error) = state.update(dt) {
+                        tracing::error!(%error, "animation playback stopped");
+                    }
+                    calculate_delay(dt, running_frames)
+                } else {
+                    running_frames = 0;
+                    idle_poll_rate
+                };
+                if let Err(error) = Time::delay(delay).await {
+                    state.fail_driver();
+                    tracing::error!(%error, "animation timer stopped");
+                    break;
+                }
+            }
+        });
+    });
+
+    Ok(state)
+}

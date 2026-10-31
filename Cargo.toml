@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["primitives", "preview", "test-harness", "dioxus-attributes"]
+# PATCH(rust-ui): dioxus-motion ported to Dioxus 0.8 for Atoll; its own package, not a member.
+exclude = ["dioxus-motion"]
 
 [workspace.dependencies]
 # PATCH(rust-ui): published as atoll-primitives; the dependency key and the library name

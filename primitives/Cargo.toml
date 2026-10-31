@@ -7,7 +7,7 @@ name = "atoll-primitives"
 version = "0.1.0"
 description = "Accessible, unstyled Dioxus primitives: DioxusLabs/components primitives with the Atoll fixes"
 edition = "2021"
-rust-version = "1.80.0"
+rust-version = "1.92.0"
 readme = "../README.md"
 keywords = ["gui", "dioxus", "components", "primitives"]
 categories = ["gui", "wasm"]
@@ -22,7 +22,7 @@ name = "dioxus_primitives"
 [dependencies]
 dioxus.workspace = true
 dioxus-attributes = { path = "../dioxus-attributes", package = "atoll-attributes", version = "0.1.0" }
-dioxus-sdk-time = "0.7.0"
+dioxus-sdk-time = "=0.8.0-alpha.3"
 time = { version = "0.3.44", features = ["std", "macros", "parsing", "local-offset"] }
 num-integer = "0.1.46"
 tracing.workspace = true
@@ -33,7 +33,7 @@ palette = "0.7.6"
 lazy-js-bundle = "0.7.9"
 
 [dev-dependencies]
-dioxus-ssr = "0.7.0"
+dioxus-ssr = "=0.8.0-alpha.3"
 
 [features]
 default = ["router"]

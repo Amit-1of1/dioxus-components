@@ -83,7 +83,7 @@ impl FocusScope {
     }
 
     pub(crate) fn key_down(mut self, event: &KeyboardEvent) {
-        self.tabbing.set(event.key() == Key::Tab);
+        self.tabbing.set(event.key() == Key::Named(NamedKey::Tab));
     }
 }
 
@@ -101,7 +101,7 @@ pub(crate) fn focus_without_scripts(element: Option<Rc<MountedData>>) {
 
 /// Whether `event` is an Escape key the element itself should handle (scripts unsupported).
 pub(crate) fn is_fallback_escape(event: &KeyboardEvent) -> bool {
-    !scripts_supported() && event.key() == Key::Escape
+    !scripts_supported() && event.key() == Key::Named(NamedKey::Escape)
 }
 
 /// A transparent window-sized layer that takes pointer moves and the release while a drag is

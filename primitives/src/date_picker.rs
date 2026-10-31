@@ -745,7 +745,7 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
                 event.prevent_default();
                 event.stop_propagation();
             }
-            Key::Backspace => {
+            Key::Named(NamedKey::Backspace) => {
                 let mut text = text_value();
                 if event.modifiers().ctrl() || event.modifiers().meta() {
                     text.clear();
@@ -754,23 +754,23 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
                 }
                 set_value(text);
             }
-            Key::Delete => {
+            Key::Named(NamedKey::Delete) => {
                 let mut text = text_value();
                 text.remove(0);
                 set_value(text);
             }
-            Key::ArrowLeft => {
+            Key::Named(NamedKey::ArrowLeft) => {
                 ctx.focus.focus_prev();
             }
-            Key::ArrowRight => {
+            Key::Named(NamedKey::ArrowRight) => {
                 ctx.focus.focus_next();
             }
-            Key::Enter => {
+            Key::Named(NamedKey::Enter) => {
                 ctx.focus.focus_next();
                 event.prevent_default();
                 event.stop_propagation();
             }
-            Key::ArrowUp => {
+            Key::Named(NamedKey::ArrowUp) => {
                 let value = match (props.value)() {
                     Some(mut value) => {
                         value.inc();
@@ -780,7 +780,7 @@ fn DateSegment<T: Clone + Copy + Integer + FromStr + Display + 'static>(
                 };
                 props.on_value_change.call(Some(value));
             }
-            Key::ArrowDown => {
+            Key::Named(NamedKey::ArrowDown) => {
                 let value = match (props.value)() {
                     Some(mut value) => {
                         value.dec();
@@ -1180,8 +1180,8 @@ pub fn DateRangePickerInputValue(props: DateRangePickerInputValueProps) -> Eleme
     let mut ctx = use_context::<DateRangePickerContext>();
     let selected_range = ctx.date_range.peek().cloned();
 
-    let mut start_date = use_signal(move || selected_range.map(|range| range.start()));
-    let mut end_date = use_signal(move || selected_range.map(|range| range.end()));
+    let start_date = use_signal(move || selected_range.map(|range| range.start()));
+    let end_date = use_signal(move || selected_range.map(|range| range.end()));
 
     // PATCH(rust-ui): only write when the value changes. A signal write notifies even when the
     // value is the same, and `DateElement` writes the typed date back on every change of its
@@ -1246,7 +1246,7 @@ fn set_if_changed<T: PartialEq + 'static>(mut signal: Signal<T>, value: T) {
 /// The editable start date value in a range picker input.
 #[component]
 pub fn DateRangePickerStartValue(props: DateRangePickerStartValueProps) -> Element {
-    let mut ctx = use_context::<DateRangeInputContext>();
+    let ctx = use_context::<DateRangeInputContext>();
 
     rsx! {
         DateElement {
@@ -1264,7 +1264,7 @@ pub fn DateRangePickerStartValue(props: DateRangePickerStartValueProps) -> Eleme
 /// The editable end date value in a range picker input.
 #[component]
 pub fn DateRangePickerEndValue(props: DateRangePickerEndValueProps) -> Element {
-    let mut ctx = use_context::<DateRangeInputContext>();
+    let ctx = use_context::<DateRangeInputContext>();
 
     rsx! {
         DateElement {

@@ -8,8 +8,8 @@ members = ["primitives", "preview", "test-harness", "dioxus-attributes"]
 dioxus-primitives = { path = "primitives", package = "atoll-primitives", version = "0.1.0" }
 tracing = { version = "0.1", features = ["std"] }
 
-dioxus = "0.7.8"
-dioxus-rsx = "0.7.8"
+dioxus = "=0.8.0-alpha.3"
+dioxus-rsx = "=0.8.0-alpha.3"
 
 [profile.release]
 opt-level = "z"

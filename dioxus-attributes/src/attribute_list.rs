@@ -71,14 +71,19 @@ impl Parse for AttributeList {
 
 impl ToTokens for AttributeList {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
-        // rendered_as_dynamic_attr returns Box<[Attribute; N]>, convert to Vec
         let attr_tokens: Vec<TokenStream2> = self
             .attributes
             .iter()
             .map(|attr| {
                 let rendered = attr.rendered_as_dynamic_attr();
+                // PATCH(rust-ui, Dioxus 0.8): dioxus-rsx 0.8 renders an attribute as
+                // `Box<[Attribute; 1]>` or `Box<[Attribute]>`; only the second is an iterator, so
+                // coerce to it first.
                 quote! {
-                    #rendered.into_iter().collect::<Vec<_>>()
+                    __attrs.extend({
+                        let __boxed: ::std::boxed::Box<[_]> = #rendered;
+                        __boxed
+                    });
                 }
             })
             .collect();
@@ -89,7 +94,7 @@ impl ToTokens for AttributeList {
             .map(|spread| {
                 let expr = &spread.expr;
                 quote! {
-                    __attrs.extend(#expr.into_iter());
+                    __attrs.extend(#expr);
                 }
             })
             .collect();
@@ -97,9 +102,7 @@ impl ToTokens for AttributeList {
         let output = quote! {
             {
                 let mut __attrs: Vec<_> = Vec::new();
-                #(
-                    __attrs.extend(#attr_tokens);
-                )*
+                #( #attr_tokens )*
                 #( #spread_tokens )*
                 __attrs
             }

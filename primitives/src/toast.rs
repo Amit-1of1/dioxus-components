@@ -70,8 +70,8 @@ pub struct ToastProviderProps {
     pub max_toasts: ReadSignal<usize>,
 
     /// The callback to render a toast. Defaults to rendering the [`Toast`] component.
-    #[props(default = Callback::new(|props: ToastPropsWithOwner| rsx! { Toast { ..props } }))]
-    pub render_toast: Callback<ToastPropsWithOwner, Element>,
+    #[props(default = Callback::new(|props: ToastProps| rsx! { Toast { ..props } }))]
+    pub render_toast: Callback<ToastProps, Element>,
 
     /// Additional attributes to apply to the toast container element.
     #[props(extends = GlobalAttributes)]
@@ -252,7 +252,7 @@ pub fn ToastProvider(props: ToastProviderProps) -> Element {
         div {
             style: "display: contents;",
             onkeydown: move |event: KeyboardEvent| {
-                if !crate::no_script::scripts_supported() && event.key() == Key::F6 {
+                if !crate::no_script::scripts_supported() && event.key() == Key::Named(NamedKey::F6) {
                     event.prevent_default();
                     focus_region(());
                 }
@@ -277,25 +277,11 @@ pub fn ToastProvider(props: ToastProviderProps) -> Element {
                     for (index, toast) in toast_list.read().iter().rev().enumerate() {
                         ToastListItem {
                             key: "{toast.id}",
-                            {
-                                props.render_toast.call(ToastProps::builder().id(toast.id)
-                                    .index(index)
-                                    .title(toast.title.clone())
-                                    .description(toast.description.clone())
-                                    .toast_type(toast.toast_type)
-                                    .permanent(toast.permanent)
-                                    .on_close({
-                                        let toast_id = toast.id;
-                                        let remove_toast = ctx.remove_toast;
-                                        move |_| {
-                                            remove_toast.call(toast_id);
-                                        }
-                                    })
-                                    // Only pass duration to non-permanent toasts
-                                    .duration(if toast.permanent { None } else { toast.duration })
-                                    .attributes(vec![])
-                                    .build()
-                                )
+                            RenderToast {
+                                toast: toast.clone(),
+                                index,
+                                render_toast: props.render_toast,
+                                remove_toast: ctx.remove_toast,
                             }
                         }
                     }
@@ -306,6 +292,38 @@ pub fn ToastProvider(props: ToastProviderProps) -> Element {
         // Portal output at the end of the document
         PortalOut { portal }
     }
+}
+
+// PATCH(rust-ui, Dioxus 0.8): 0.8 has no `PropsWithOwner`, so `render_toast` takes `ToastProps`
+// (as upstream's 0.8 branch does). One toast per component, so `on_close` is created once per
+// toast with `use_callback` and dropped with it.
+#[component]
+fn RenderToast(
+    toast: ToastRecord,
+    index: usize,
+    render_toast: Callback<ToastProps, Element>,
+    remove_toast: Callback<usize>,
+) -> Element {
+    let toast_id = toast.id;
+    let on_close = use_callback(move |_| remove_toast.call(toast_id));
+
+    render_toast.call(ToastProps {
+        id: toast.id,
+        index,
+        title: toast.title,
+        description: toast.description,
+        toast_type: toast.toast_type,
+        permanent: toast.permanent,
+        on_close,
+        // Only pass duration to non-permanent toasts
+        duration: if toast.permanent {
+            None
+        } else {
+            toast.duration
+        },
+        attributes: vec![],
+        children: None,
+    })
 }
 
 /// The ordered list containing rendered toasts.

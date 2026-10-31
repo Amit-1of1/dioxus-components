@@ -3,9 +3,9 @@ resolver = "3"
 members = ["primitives", "preview", "test-harness", "dioxus-attributes"]
 
 [workspace.dependencies]
-# PATCH(rust-ui): published as rust-ui-primitives; the dependency key and the library name
+# PATCH(rust-ui): published as atoll-primitives; the dependency key and the library name
 # stay `dioxus-primitives` / `dioxus_primitives`, so no source changes.
-dioxus-primitives = { path = "primitives", package = "rust-ui-primitives", version = "0.1.0" }
+dioxus-primitives = { path = "primitives", package = "atoll-primitives", version = "0.1.0" }
 tracing = { version = "0.1", features = ["std"] }
 
 dioxus = "0.7.8"

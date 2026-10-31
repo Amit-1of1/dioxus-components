@@ -1,11 +1,11 @@
 [package]
-# PATCH(rust-ui): DioxusLabs/components primitives at 9a75825 plus the fixes in Rust UI's
+# PATCH(rust-ui): DioxusLabs/components primitives at 9a75825 plus the fixes in Atoll's
 # docs/FORKS.md, published under its own name because upstream has not released
 # `dioxus-primitives` (crates.io holds an empty 0.0.0 placeholder). The library keeps its name,
 # so code still says `use dioxus_primitives::...`.
-name = "rust-ui-primitives"
+name = "atoll-primitives"
 version = "0.1.0"
-description = "Accessible, unstyled Dioxus primitives: DioxusLabs/components primitives with the Rust UI fixes"
+description = "Accessible, unstyled Dioxus primitives: DioxusLabs/components primitives with the Atoll fixes"
 edition = "2021"
 rust-version = "1.80.0"
 readme = "../README.md"
@@ -21,7 +21,7 @@ name = "dioxus_primitives"
 
 [dependencies]
 dioxus.workspace = true
-dioxus-attributes = { path = "../dioxus-attributes", package = "rust-ui-attributes", version = "0.1.0" }
+dioxus-attributes = { path = "../dioxus-attributes", package = "atoll-attributes", version = "0.1.0" }
 dioxus-sdk-time = "0.7.0"
 time = { version = "0.3.44", features = ["std", "macros", "parsing", "local-offset"] }
 num-integer = "0.1.46"

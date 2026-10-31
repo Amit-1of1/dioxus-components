@@ -1,6 +1,6 @@
 [package]
-# PATCH(rust-ui): published as rust-ui-attributes for rust-ui-primitives; the library keeps its name.
-name = "rust-ui-attributes"
+# PATCH(rust-ui): published as atoll-attributes for atoll-primitives; the library keeps its name.
+name = "atoll-attributes"
 version = "0.1.0"
 edition = "2021"
 description = "Proc macro for creating dynamic attribute lists for Dioxus elements"

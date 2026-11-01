@@ -4,7 +4,13 @@ use std::rc::Rc;
 
 use crate::{
     collection::{collection_item, use_collection_provider, use_item, CollectionState},
-    merge_attributes, use_animated_open, use_controlled, use_id_or, use_unique_id,
+    merge_attributes,
+    submenu::{
+        sub_attributes, sub_content_attributes, sub_trigger_attributes, use_sub_content,
+        use_sub_trigger, use_submenu, Submenu, SubmenuContentProps, SubmenuProps,
+        SubmenuTriggerProps, TriggerRole,
+    },
+    use_animated_open, use_controlled, use_id_or, use_unique_id,
 };
 use dioxus::prelude::*;
 use dioxus_attributes::attributes;
@@ -475,6 +481,118 @@ pub fn DropdownMenuItem<T: Clone + PartialEq + 'static>(
 
             ..props.attributes,
             {props.children}
+        }
+    }
+}
+
+// PATCH(rust-ui): nested submenus (see `crate::submenu`).
+
+/// The props for the [`DropdownMenuSub`] component.
+pub type DropdownMenuSubProps = SubmenuProps;
+/// The props for the [`DropdownMenuSubTrigger`] component.
+pub type DropdownMenuSubTriggerProps = SubmenuTriggerProps;
+/// The props for the [`DropdownMenuSubContent`] component.
+pub type DropdownMenuSubContentProps = SubmenuContentProps;
+
+/// # DropdownMenuSub
+///
+/// A nested menu inside a [`DropdownMenuContent`] (or another submenu's content). Holds a
+/// [`DropdownMenuSubTrigger`], which is an item of the surrounding menu at `index`, and a
+/// [`DropdownMenuSubContent`] with ordinary [`DropdownMenuItem`]s.
+///
+/// ## Example
+/// ```rust
+/// use dioxus::prelude::*;
+/// use dioxus_primitives::dropdown_menu::*;
+/// #[component]
+/// fn Demo() -> Element {
+///     rsx! {
+///         DropdownMenu {
+///             DropdownMenuTrigger { "File" }
+///             DropdownMenuContent {
+///                 DropdownMenuItem::<String> { value: "new".to_string(), index: 0usize, "New" }
+///                 DropdownMenuSub { index: 1usize,
+///                     DropdownMenuSubTrigger { "Open recent" }
+///                     DropdownMenuSubContent {
+///                         DropdownMenuItem::<String> { value: "a".to_string(), index: 0usize, "a.txt" }
+///                         DropdownMenuItem::<String> { value: "b".to_string(), index: 1usize, "b.txt" }
+///                     }
+///                 }
+///             }
+///         }
+///     }
+/// }
+/// ```
+///
+/// ## Styling
+///
+/// The wrapper, trigger and content carry `data-state` (`open` or `closed`); the wrapper and
+/// trigger also carry `data-disabled`.
+#[component]
+pub fn DropdownMenuSub(props: DropdownMenuSubProps) -> Element {
+    let ctx: DropdownMenuContext = use_context();
+    let sub = use_submenu(
+        &props,
+        ctx.focus,
+        ctx.open,
+        move || (ctx.disabled)(),
+        move |_| ctx.set_open.call(false),
+    );
+    use_context_provider(|| sub);
+    let merged = merge_attributes(vec![sub_attributes(sub), props.attributes]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # DropdownMenuSubTrigger
+///
+/// The item that opens a [`DropdownMenuSub`]: ArrowRight, Enter, Space, a click or resting the
+/// pointer on it. It is an `option` like its siblings; a `listbox` option cannot carry
+/// `aria-haspopup` or `aria-expanded`, so it points at the open list with `aria-controls`.
+#[component]
+pub fn DropdownMenuSubTrigger(props: DropdownMenuSubTriggerProps) -> Element {
+    let sub: Submenu = use_context();
+    let item = use_sub_trigger(sub);
+    let role = TriggerRole {
+        role: "option",
+        popup: None,
+    };
+    let merged = merge_attributes(vec![
+        sub_trigger_attributes(sub, item, role),
+        props.attributes,
+    ]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # DropdownMenuSubContent
+///
+/// The list of a [`DropdownMenuSub`], rendered while it is open. ArrowLeft or Escape closes it
+/// and returns focus to the trigger; choosing an item closes the whole menu.
+#[component]
+pub fn DropdownMenuSubContent(props: DropdownMenuSubContentProps) -> Element {
+    let parent: DropdownMenuContext = use_context();
+    let sub: Submenu = use_context();
+    // Items inside talk to the submenu's collection; choosing one still closes the menu.
+    use_context_provider(|| DropdownMenuContext {
+        open: sub.open,
+        focus: sub.focus,
+        ..parent
+    });
+    use_id_or(sub.content_id, props.id);
+    let render = use_sub_content(sub);
+    let merged = merge_attributes(vec![
+        sub_content_attributes(sub, "listbox"),
+        props.attributes,
+    ]);
+
+    rsx! {
+        if render() {
+            div { ..merged, {props.children} }
         }
     }
 }

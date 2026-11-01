@@ -7,6 +7,12 @@ use crate::{
         collection_item, use_collection_provider, use_deferred_collection_focus, use_item,
         CollectionPlacement, CollectionState,
     },
+    merge_attributes,
+    submenu::{
+        sub_attributes, sub_content_attributes, sub_trigger_attributes, use_sub_content,
+        use_sub_trigger, use_submenu, Submenu, SubmenuContentProps, SubmenuProps,
+        SubmenuTriggerProps, TriggerRole,
+    },
     use_animated_open, use_id_or, use_unique_id,
 };
 
@@ -681,6 +687,95 @@ pub fn MenubarItem(props: MenubarItemProps) -> Element {
 
             ..props.attributes,
             {props.children}
+        }
+    }
+}
+
+// PATCH(rust-ui): nested submenus (see `crate::submenu`).
+
+/// The props for the [`MenubarSub`] component.
+pub type MenubarSubProps = SubmenuProps;
+/// The props for the [`MenubarSubTrigger`] component.
+pub type MenubarSubTriggerProps = SubmenuTriggerProps;
+/// The props for the [`MenubarSubContent`] component.
+pub type MenubarSubContentProps = SubmenuContentProps;
+
+/// # MenubarSub
+///
+/// A nested menu inside a [`MenubarContent`] (or another submenu's content). Holds a
+/// [`MenubarSubTrigger`], which is an item of the surrounding menu at `index`, and a
+/// [`MenubarSubContent`] with ordinary [`MenubarItem`]s.
+///
+/// ## Styling
+///
+/// The wrapper, trigger and content carry `data-state` (`open` or `closed`); the wrapper and
+/// trigger also carry `data-disabled`.
+#[component]
+pub fn MenubarSub(props: MenubarSubProps) -> Element {
+    let mut ctx: MenubarContext = use_context();
+    let mut menu_ctx: MenubarMenuContext = use_context();
+    let sub = use_submenu(
+        &props,
+        menu_ctx.focus,
+        menu_ctx.is_open,
+        move || (ctx.disabled)() || (menu_ctx.disabled)(),
+        move |_| {
+            menu_ctx.focus.clear_focus();
+            ctx.focus.clear_focus();
+            ctx.set_open_menu.call(None);
+        },
+    );
+    use_context_provider(|| sub);
+    let merged = merge_attributes(vec![sub_attributes(sub), props.attributes]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # MenubarSubTrigger
+///
+/// The `menuitem` that opens a [`MenubarSub`]: ArrowRight, Enter, Space, a click or resting the
+/// pointer on it. ArrowLeft on it still moves to the previous menubar menu.
+#[component]
+pub fn MenubarSubTrigger(props: MenubarSubTriggerProps) -> Element {
+    let sub: Submenu = use_context();
+    let item = use_sub_trigger(sub);
+    let role = TriggerRole {
+        role: "menuitem",
+        popup: Some("menu"),
+    };
+    let merged = merge_attributes(vec![
+        sub_trigger_attributes(sub, item, role),
+        props.attributes,
+    ]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # MenubarSubContent
+///
+/// The `menu` of a [`MenubarSub`], rendered while it is open. ArrowLeft or Escape closes it and
+/// returns focus to the trigger; ArrowRight on an item moves to the next menubar menu, and
+/// choosing an item closes the menu.
+#[component]
+pub fn MenubarSubContent(props: MenubarSubContentProps) -> Element {
+    let menu_ctx: MenubarMenuContext = use_context();
+    let sub: Submenu = use_context();
+    use_context_provider(|| MenubarMenuContext {
+        focus: sub.focus,
+        is_open: sub.open,
+        ..menu_ctx
+    });
+    use_id_or(sub.content_id, props.id);
+    let render = use_sub_content(sub);
+    let merged = merge_attributes(vec![sub_content_attributes(sub, "menu"), props.attributes]);
+
+    rsx! {
+        if render() {
+            div { ..merged, {props.children} }
         }
     }
 }

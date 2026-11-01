@@ -3,7 +3,13 @@
 use crate::no_script::use_focus_scope;
 use crate::{
     collection::{collection_item, use_collection_provider, use_item, CollectionState},
+    merge_attributes,
     selectable::{pointer_select_cancel, pointer_select_commit, pointer_select_start},
+    submenu::{
+        sub_attributes, sub_content_attributes, sub_trigger_attributes, use_sub_content,
+        use_sub_trigger, use_submenu, Submenu, SubmenuContentProps, SubmenuProps,
+        SubmenuTriggerProps, TriggerRole,
+    },
     use_animated_open, use_controlled, use_effect_with_cleanup, use_id_or, use_outside_dismiss,
     use_unique_id,
 };
@@ -664,6 +670,92 @@ pub fn ContextMenuItem(props: ContextMenuItemProps) -> Element {
             ..props.attributes,
 
             {props.children}
+        }
+    }
+}
+
+// PATCH(rust-ui): nested submenus (see `crate::submenu`).
+
+/// The props for the [`ContextMenuSub`] component.
+pub type ContextMenuSubProps = SubmenuProps;
+/// The props for the [`ContextMenuSubTrigger`] component.
+pub type ContextMenuSubTriggerProps = SubmenuTriggerProps;
+/// The props for the [`ContextMenuSubContent`] component.
+pub type ContextMenuSubContentProps = SubmenuContentProps;
+
+/// # ContextMenuSub
+///
+/// A nested menu inside a [`ContextMenuContent`] (or another submenu's content). Holds a
+/// [`ContextMenuSubTrigger`], which is an item of the surrounding menu at `index`, and a
+/// [`ContextMenuSubContent`] with ordinary [`ContextMenuItem`]s.
+///
+/// ## Styling
+///
+/// The wrapper, trigger and content carry `data-state` (`open` or `closed`); the wrapper and
+/// trigger also carry `data-disabled`.
+#[component]
+pub fn ContextMenuSub(props: ContextMenuSubProps) -> Element {
+    let mut ctx: ContextMenuCtx = use_context();
+    let sub = use_submenu(
+        &props,
+        ctx.focus,
+        ctx.open,
+        move || (ctx.disabled)(),
+        move |_| {
+            ctx.focus.clear_focus();
+            ctx.set_open.call(false);
+        },
+    );
+    use_context_provider(|| sub);
+    let merged = merge_attributes(vec![sub_attributes(sub), props.attributes]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # ContextMenuSubTrigger
+///
+/// The `menuitem` that opens a [`ContextMenuSub`]: ArrowRight, Enter, Space, a click or resting
+/// the pointer on it.
+#[component]
+pub fn ContextMenuSubTrigger(props: ContextMenuSubTriggerProps) -> Element {
+    let sub: Submenu = use_context();
+    let item = use_sub_trigger(sub);
+    let role = TriggerRole {
+        role: "menuitem",
+        popup: Some("menu"),
+    };
+    let merged = merge_attributes(vec![
+        sub_trigger_attributes(sub, item, role),
+        props.attributes,
+    ]);
+
+    rsx! {
+        div { ..merged, {props.children} }
+    }
+}
+
+/// # ContextMenuSubContent
+///
+/// The `menu` of a [`ContextMenuSub`], rendered while it is open. ArrowLeft or Escape closes it
+/// and returns focus to the trigger; choosing an item closes the whole menu.
+#[component]
+pub fn ContextMenuSubContent(props: ContextMenuSubContentProps) -> Element {
+    let parent: ContextMenuCtx = use_context();
+    let sub: Submenu = use_context();
+    use_context_provider(|| ContextMenuCtx {
+        open: sub.open,
+        focus: sub.focus,
+        ..parent
+    });
+    use_id_or(sub.content_id, props.id);
+    let render = use_sub_content(sub);
+    let merged = merge_attributes(vec![sub_content_attributes(sub, "menu"), props.attributes]);
+
+    rsx! {
+        if render() {
+            div { ..merged, {props.children} }
         }
     }
 }

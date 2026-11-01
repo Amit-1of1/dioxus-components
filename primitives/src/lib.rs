@@ -43,11 +43,13 @@ mod portal;
 pub mod progress;
 pub mod radio_group;
 pub mod scroll_area;
+// PATCH(rust-ui): nested submenus for dropdown menu, context menu and menubar.
 pub mod select;
 mod selectable;
 mod selection;
 pub mod separator;
 pub mod slider;
+pub mod submenu;
 pub mod switch;
 pub mod tabs;
 pub mod tag_group;

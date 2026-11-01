@@ -5,7 +5,6 @@ use crate::{
     use_global_keydown_listener, use_unique_id,
 };
 use dioxus::prelude::*;
-use dioxus_sdk_time::use_timeout;
 use std::collections::VecDeque;
 use std::time::Duration;
 
@@ -493,24 +492,29 @@ pub fn Toast(props: ToastProps) -> Element {
         on_close: props.on_close,
     });
 
-    // Handle auto-dismissal for non-permanent toasts with a duration
-    // Double-check that the toast is not permanent and has a duration
-    if !props.permanent && props.duration.is_some() {
-        let duration = props.duration.unwrap();
-        let toast_id = props.id;
-        let remove_toast = ctx.remove_toast;
-
-        // Create a timeout using dioxus-time
-        let timeout = use_timeout(duration, move |()| {
-            // Call the remove_toast function directly with the toast ID
-            remove_toast.call(toast_id);
-        });
-
-        // Start the timeout when the component mounts
-        use_effect(move || {
-            timeout.action(());
-        });
-    }
+    // PATCH(rust-ui): the timeout pauses while the pointer is over the toast or focus is
+    // inside it, so people can read it and reach its buttons (WCAG 2.2.1 Timing Adjustable).
+    // Upstream ran one fixed timer that removed a toast out from under a focused close button.
+    let mut hovered = use_signal(|| false);
+    let mut focused = use_signal(|| false);
+    let auto_dismiss = (!props.permanent).then_some(props.duration).flatten();
+    let toast_id = props.id;
+    let remove_toast = ctx.remove_toast;
+    use_hook(move || {
+        if let Some(duration) = auto_dismiss {
+            spawn(async move {
+                const TICK: Duration = Duration::from_millis(100);
+                let mut left = duration;
+                while !left.is_zero() {
+                    dioxus_sdk_time::sleep(TICK).await;
+                    if !*hovered.peek() && !*focused.peek() {
+                        left = left.saturating_sub(TICK);
+                    }
+                }
+                remove_toast.call(toast_id);
+            });
+        }
+    });
 
     let children = props.children.unwrap_or_else(|| {
         rsx! {
@@ -540,6 +544,11 @@ pub fn Toast(props: ToastProps) -> Element {
             "data-toast-odd": (props.index % 2 == 1).then_some("true"),
             "data-top": (props.index == 0).then_some("true"),
             style: "--toast-index: {props.index}",
+            "data-paused": (hovered() || focused()).then_some("true"),
+            onmouseenter: move |_| hovered.set(true),
+            onmouseleave: move |_| hovered.set(false),
+            onfocusin: move |_| focused.set(true),
+            onfocusout: move |_| focused.set(false),
             ..props.attributes,
 
             {children}

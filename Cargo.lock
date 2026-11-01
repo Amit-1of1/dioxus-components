@@ -627,6 +627,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "atoll-attributes"
+version = "0.1.0"
+dependencies = [
+ "dioxus-rsx",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "atoll-primitives"
+version = "0.1.0"
+dependencies = [
+ "atoll-attributes",
+ "dioxus",
+ "dioxus-sdk-time",
+ "dioxus-ssr",
+ "lazy-js-bundle",
+ "num-integer",
+ "palette",
+ "serde",
+ "time",
+ "tracing",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6255,6 +6281,7 @@ checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
 name = "preview"
 version = "0.1.0"
 dependencies = [
+ "atoll-primitives",
  "dioxus",
  "dioxus-code",
  "dioxus-i18n",
@@ -6262,7 +6289,6 @@ dependencies = [
  "dioxus-ssr",
  "palette",
  "pulldown-cmark",
- "atoll-primitives",
  "serde_json",
  "strum",
  "time",
@@ -6899,32 +6925,6 @@ name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
-
-[[package]]
-name = "atoll-attributes"
-version = "0.1.0"
-dependencies = [
- "dioxus-rsx",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "atoll-primitives"
-version = "0.1.0"
-dependencies = [
- "dioxus",
- "dioxus-sdk-time",
- "dioxus-ssr",
- "lazy-js-bundle",
- "num-integer",
- "palette",
- "atoll-attributes",
- "serde",
- "time",
- "tracing",
-]
 
 [[package]]
 name = "rustc-hash"
@@ -8025,8 +8025,8 @@ dependencies = [
 name = "test-harness"
 version = "0.1.0"
 dependencies = [
- "dioxus",
  "atoll-primitives",
+ "dioxus",
 ]
 
 [[package]]

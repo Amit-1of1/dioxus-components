@@ -758,8 +758,8 @@ pub fn MenubarSubTrigger(props: MenubarSubTriggerProps) -> Element {
 /// # MenubarSubContent
 ///
 /// The `menu` of a [`MenubarSub`], rendered while it is open. ArrowLeft or Escape closes it and
-/// returns focus to the trigger; ArrowRight on an item moves to the next menubar menu, and
-/// choosing an item closes the menu.
+/// returns focus to the trigger; other keys (ArrowRight on an item, Tab) go on to the menubar,
+/// and choosing an item closes the menu.
 #[component]
 pub fn MenubarSubContent(props: MenubarSubContentProps) -> Element {
     let menu_ctx: MenubarMenuContext = use_context();

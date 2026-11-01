@@ -572,7 +572,9 @@ pub fn DropdownMenuSubTrigger(props: DropdownMenuSubTriggerProps) -> Element {
 /// # DropdownMenuSubContent
 ///
 /// The list of a [`DropdownMenuSub`], rendered while it is open. ArrowLeft or Escape closes it
-/// and returns focus to the trigger; choosing an item closes the whole menu.
+/// and returns focus to the trigger; choosing an item closes the whole menu. It is a `group` of
+/// options labelled by its trigger, not a nested `listbox`: a listbox may own only options and
+/// groups.
 #[component]
 pub fn DropdownMenuSubContent(props: DropdownMenuSubContentProps) -> Element {
     let parent: DropdownMenuContext = use_context();
@@ -585,10 +587,7 @@ pub fn DropdownMenuSubContent(props: DropdownMenuSubContentProps) -> Element {
     });
     use_id_or(sub.content_id, props.id);
     let render = use_sub_content(sub);
-    let merged = merge_attributes(vec![
-        sub_content_attributes(sub, "listbox"),
-        props.attributes,
-    ]);
+    let merged = merge_attributes(vec![sub_content_attributes(sub, "group"), props.attributes]);
 
     rsx! {
         if render() {

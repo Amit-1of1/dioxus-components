@@ -270,7 +270,7 @@ impl Submenu {
     }
 }
 
-/// Attributes for the `*Sub` wrapper element.
+/// Attributes for the `*Sub` wrapper element, a plain box around the trigger and the content.
 pub(crate) fn sub_attributes(sub: Submenu) -> Vec<Attribute> {
     dioxus_attributes::attributes!(div {
         "data-state": if (sub.open)() { "open" } else { "closed" },
@@ -356,7 +356,7 @@ pub(crate) fn use_sub_content(sub: Submenu) -> impl Fn() -> bool + Copy {
     render
 }
 
-/// Attributes for the `*SubContent` element. `role` is the role of the parent menu's list.
+/// Attributes for the `*SubContent` element: `menu` in a menu, `group` in a listbox.
 pub(crate) fn sub_content_attributes(sub: Submenu, role: &'static str) -> Vec<Attribute> {
     let mut focus = sub.focus;
     let orientation = (role == "menu").then_some("vertical");
